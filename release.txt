@@ -1,0 +1,106 @@
+Release notes for
+*************************************************
+GNU Tools for Arm Embedded Processors 9
+                               - Q4 2019
+*************************************************
+
+This release includes bare metal pre-built binaries for AArch32 EABI targets,
+which can be hosted on:
+* Windows 10 32/64 bits or later (with installer and alternative zip package)
+* Linux
+  - Ubuntu 14.04 or later AArch64 (tarball)
+  - Ubuntu 14.04 or later x86_64 (tarball)
+  - RHEL 7 64 bits (tarball)
+* Mac OS X 10.13 and newer 64 bits (tarball)
+
+It also contains source code package (together with build scripts and
+instructions to setup build environment), which is composed of:
+
+  * gcc : %GCC_BRANCH%
+    %GCC_URL% revision %GCC_REV%
+
+  * binutils : %BINUTILS_BRANCH%
+    %BINUTILS_URL% commit %BINUTILS_SHA1%
+
+  * newlib and newlib-nano : %NEWLIB_BRANCH%
+    %NEWLIB_URL% commit %NEWLIB_SHA1%
+
+  * gdb : %GDB_BRANCH%
+    %GDB_URL% commit %GDB_SHA1%
+
+Note that some or all of the following prerequisites are downloaded when
+building from source:
+
+  * EnvVarUpdate NSIS script :
+    http://nsis.sourceforge.net/mediawiki/images/a/ad/EnvVarUpdate.7z
+
+  * expat %EXPAT_VER% :
+    %EXPAT_URL%
+
+  * gmp %GMP_VER% :
+    %GMP_URL%
+
+  * isl %ISL_VER% :
+    %ISL_URL%
+
+  * libelf %LIBELF_VER% :
+    %LIBELF_URL%
+
+  * libiconv %LIBICONV_VER% :
+    %LIBICONV_URL%
+
+  * mpc %MPC_VER% :
+    %MPC_URL%
+
+  * mpfr %MPFR_VER% :
+    %MPFR_URL%
+
+  * python %PYTHON_WIN_VER% :
+    %PYTHON_WIN_URL%
+
+  * zlib %ZLIB_VER%
+    %ZLIB_URL%
+
+Features:
+* All GCC 9.2 features, plus latest mainline features
+
+Tests:
+* Targets
+  + variety of Cortex-M0/M0+/M3/M4/M7/A9 boards
+  + Qemu
+  + Arm Fast Models
+
+Important changes in 9-2019Q4 major release:
+* Windows package only tested on Windows 10.
+
+* Fixed https://sourceware.org/bugzilla/show_bug.cgi?id=24289
+  MEMORY regions can no longer use LENGTH and ORIGIN.
+
+* Fixed https://community.arm.com/developer/tools-software/oss-platforms/f/gnu-toolchain-forum/13503/gcc-g-version-8-very-slow-to-compile
+  GCC 8 very slow to compile
+
+* Fixed https://sourceware.org/bugzilla/show_bug.cgi?id=25081
+  Discrepancy between VMA and LMA after ALIGN
+
+* Additional armv7-r multilib directory: thumb/v7-r+fp.sp
+
+* Added AArch64 Linux host package
+
+* Windows installer now accepts the following options when running in silent mode:
+  - /P Adds the installation bin directory to the system PATH
+  - /R Adds an InstallFolder registry entry for the install.
+
+Known issues:
+* Doing IPA on CMSE generates a linker error:
+The linker will error out when resulting object file contains a symbol for
+the clone function with the __acle_se prefix that has a non-local binding.
+  Issue occurs when compiling binaries for M-profile Secure Extensions where
+the compiler may decide to clone a function with the cmse_nonsecure_entry
+attribute.
+  Although cloning nonsecure entry functions is legal, as long as the clone
+is only used inside the secure application, the clone function itself should
+not be seen as a secure entry point and so it should not have the __acle_se
+prefix.
+  A possible work around for this is to add a 'noclone' attribute to
+functions with the 'cmse_nonsecure_entry'. This will prevent GCC from cloning
+such functions.

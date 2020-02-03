@@ -1,0 +1,287 @@
+\input texinfo @c -*-texinfo-*-
+@c %**start of header
+@c makeinfo and texinfo.tex ignore all text before @setfilename.
+@c
+@c Ordinarily, the setfilename argument ends with .info.  But
+@c texinfo.info-13 is too long for 14-character filesystems.
+@setfilename how-to-build-toolchain.info
+@include version.texi
+@settitle How To Build Toolchain
+@paragraphindent asis
+@c %**end of header
+
+@copying
+Copyright @copyright{} 2012-@value{CURRENT_YEAR} ARM Ltd.
+@end copying
+
+@finalout
+@smallbook
+
+@titlepage
+@title The Build Process
+@subtitle of @value{VERSION_PACKAGE}
+@subtitle @value{CURRENT_YEAR}-@value{CURRENT_MONTH}
+
+@c The following two commands start the copyright page
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@c Output the table of contents at the beginning.
+@contents
+
+@ifnottex
+@node Top
+@top How To Build Toolchain
+
+@insertcopying
+@end ifnottex
+
+@node Preface
+@unnumbered Preface
+This manual provides a step-by-step guide to help you build
+@samp{GNU Tools for Arm Embedded Processors} on a newly installed
+Ubuntu 14.04 LTS 64-bit operating system.
+
+@noindent
+Note that the steps below may most likely also work on an Ubuntu which is
+not newly installed or version other than 14.04 LTS, but it is not guaranteed.
+In this case please go through @ref{Known Issues} before you go, and
+you need to solve any other problems you may encounter by yourself.  We
+highly appreciate if you could share the problems and solutions with us.
+
+@node Ubuntu
+@chapter Build GNU Tools for Linux and Windows Platforms
+
+@node Install Ubuntu
+@section Install Ubuntu
+@c Use '@/' to allow break inside a URL
+Ubuntu 14.04.5 ISO image is available from
+@uref{http://releases.ubuntu.com@//14.04@//ubuntu-14.04.5-desktop-amd64.iso}.
+You can install it as a native system or a virtual machine.
+
+@page
+@node Install Dependencies
+@section Install Dependencies
+
+@node Install dependencies available in Ubuntu's repositories
+@subsection Install dependencies available in Ubuntu's repositories
+
+Execute the commands in this section to install the tools needed to build the
+toolchain.  Lines starting with '$' denote commands that need to be input as is
+while lines starting with '#' are comments and as such do not need to be typed
+in.
+
+@noindent
+Please note that the "Ignoring Provides line" and "unknown Multi-Arch type"
+warnings when executing @code{apt-get update} are harmless and can thus safely
+be ignored.  Similarly, the warning about @code{update-alternatives} skipping
+the creation of symbolic links when executing @code{apt-get install} is also
+harmless and can therefore safely be ignored.@*
+
+@smallformat
+@codequoteundirected on
+@group
+@verbatim
+# Start root session
+$ sudo su
+@end verbatim
+@end group
+
+@group
+@verbatim
+# Add extra repositories to be used by APT
+$ apt-get install software-properties-common
+$ add-apt-repository universe
+$ cat >/etc/apt/sources.list.d/xenial.list <<EOF
+deb http://archive.ubuntu.com/ubuntu xenial main universe
+deb-src http://archive.ubuntu.com/ubuntu xenial main universe
+deb http://security.ubuntu.com/ubuntu xenial-security main
+EOF
+@end verbatim
+@end group
+
+@group
+@verbatim
+# Ensure package for Ubuntu Trusty are chosen by default
+$ echo 'APT::Default-Release "trusty";' > /etc/apt/apt.conf.d/00default
+@end verbatim
+@end group
+
+@group
+@verbatim
+# Enable use of 32bit packages
+$ dpkg --add-architecture i386
+$ apt-get update
+@end verbatim
+@end group
+
+@group
+@verbatim
+# Install packages
+$ apt-get install -y -t xenial \
+    gcc-mingw-w64-i686 g++-mingw-w64-i686 binutils-mingw-w64-i686
+$ apt-get -f install -y \
+    build-essential \
+    autoconf \
+    autogen \
+    bison \
+    dejagnu \
+    flex \
+    flip \
+    gawk \
+    git \
+    gperf \
+    gzip \
+    nsis \
+    openssh-client \
+    p7zip-full \
+    perl \
+    python-dev \
+    libisl-dev \
+    scons \
+    tcl \
+    texinfo \
+    tofrodos \
+    wget \
+    zip \
+    texlive \
+    texlive-extra-utils \
+    libncurses5-dev
+@end verbatim
+@end group
+
+@group
+@verbatim
+# End root session
+$exit
+@end verbatim
+@end group
+@codequoteundirected off
+@end smallformat
+
+@page
+@node Build GNU Tools for Arm Embedded Processors
+@section Build GNU Tools for Arm Embedded Processors
+
+@noindent
+You are now ready to build the toolchain. Just follow the below instructions,
+substituting @code{~/toolchain} by the directory in which you wish to build
+the toolchain. Note that if you are not interested in the Windows toolchain,
+you can speed up the build by passing the option @code{--skip_steps=mingw32}
+to @strong{all} of install-sources.sh, build-prerequisites.sh and
+build-toolchain.sh.
+
+@smallexample
+@group
+@set txicodequoteundirected
+# Create a directory in which to build the toolchain and copy the source
+# release package into it.
+$ mkdir ~/toolchain
+$ cp @value{PKG_NAME}-src.tar.bz2 ~/toolchain
+
+# Untar the source tarball.
+$ cd ~/toolchain
+$ tar -xjf @value{PKG_NAME}-src.tar.bz2
+$ cd ./@value{PKG_NAME}
+$ ./install-sources.sh
+
+# Build the toolchain(s).
+$ cd ../
+$ ./build-prerequisites.sh
+$ ./build-toolchain.sh
+
+@clear txicodequoteundirected
+@end group
+@end smallexample
+
+@noindent
+Once the build completes you can find the binary and source tarballs in
+ @* @samp{~/toolchain/@value{PKG_NAME}/pkg}
+along with the md5 checksum.
+
+@node Mac
+@chapter Build GNU Tools on Mac OS X
+In addition to the build on Ubuntu, the build scripts in same source
+package can also be used on Mac OS X to natively build a tool chain
+whose host is Mac OS X and target is arm-none-eabi.  In this step we
+will describe how to install required software components and how to
+execute the build scripts.  After this step you should be able to
+generate a same tool chain with the one released.  This build process
+has been tested on Mac OS X 10.13.
+
+@node Prepare a Mac OS X environment
+@section Prepare a Mac OS X environment
+The hardware should be an x86-based Mac machine like iMac. The installed
+OS should be Mac OS X which is updated to 10.13.  The way to find out
+the Mac OS X version information is to click the @strong{Apple} menu and
+choose @strong{About This Mac}.
+
+@node Install the latest Command Line Tools for Xcode
+@section Install the latest Command Line Tools for Xcode
+This component is originally part of Apple Xcode but can be installed
+separately without Xcode.  It can be freely obtained from Apple's official
+website @uref{https://developer.apple.com@//downloads/index.action}.
+A valid Apple ID is required to login and download.
+
+@node Install MacTeX to build PDF format documents
+@section Install MacTeX to build PDF format documents
+This is an optional step and can be skipped if PDF format documents aren't
+needed. Please refer to @uref{https://tug.org/mactex/mactex-download.html}
+and follow the instructions given there.
+
+@node Build the tool chain under Mac OS X
+@section Build the tool chain under Mac OS X
+With all the dependent packages installed, we can start to natively
+build the tool chain on Mac OS.  Following are the commands and steps we are
+using:
+
+@smallexample
+@set txicodequoteundirected
+
+# Copy the src release package into ~/mac-build/ directory
+$ cp @value{PKG_NAME}-src.tar.bz2 ~/mac-build
+
+# Prepare source codes
+$ cd ~/mac-build
+$ tar xjf @value{PKG_NAME}-src.tar.bz2
+$ cd ./@value{PKG_NAME}
+$ ./install-sources.sh
+
+# Start building the toolchain.
+$ ./build-prerequisites.sh
+$ ./build-toolchain.sh
+
+@clear txicodequoteundirected
+@end smallexample
+
+@node Known Issues
+@appendix Known Issues
+
+@itemize @bullet
+@item
+If you are using different build environment and tools, you might run
+into a problem where binutils can not be successfully built.  This is
+probably caused by binutils bug 13036.
+For more information, please refer to 
+@uref{http://sourceware.org/bugzilla/show_bug.cgi?id=13036}.
+
+@item
+Some shell scripts in gcc and other packages are incompatible with
+the dash shell, which is the default /bin/sh for Ubuntu 14.04 LTS.
+You must make /bin/sh a symbolic link to one of the supported shells:
+saying bash.  Here on Ubuntu 14.04 LTS system, this can be done by
+running following command:
+@smallexample
+$ sudo dpkg-reconfigure -plow dash
+@end smallexample
+
+Then choose @samp{No} in the @samp{Configuring dash} popup dialog and
+press enter.  You can run following command and check that /bin/sh
+points to @samp{bash}:
+@smallexample
+$ ls -l /bin/sh
+...... /bin/sh -> bash
+@end smallexample
+@bye

@@ -1,0 +1,4 @@
+deb http://uk.archive.ubuntu.com/ubuntu/ trusty main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu trusty-security main
+
+
