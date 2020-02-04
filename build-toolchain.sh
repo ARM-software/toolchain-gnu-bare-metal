@@ -976,6 +976,7 @@ if [ "x$skip_package_sources" != "xyes" ]; then
     cp "$ROOT/build-toolchain.sh" "$PACKAGE_NAME/"
     cp "$ROOT/python-config.sh" "$PACKAGE_NAME/"
     cp "$ROOT/build.sh" "$PACKAGE_NAME/"
+    cp "$ROOT/README" "$PACKAGE_NAME/"
     cp -r "$ROOT/docker" "$PACKAGE_NAME/"
 
     tar cf "$PACKAGE_NAME-src.tar.bz2" "$PACKAGE_NAME" ${TAR_FLAGS:-}
@@ -1004,3 +1005,4 @@ if [ "x$skip_md5_checksum" != "xyes" ]; then
     fi
     popd
 fi
+echo Build completed! Packages can be found at dirctory "pkg"
