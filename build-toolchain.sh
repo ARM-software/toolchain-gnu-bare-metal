@@ -632,9 +632,9 @@ fi
 echo Task [III-11] /$HOST_NATIVE/package_tbz2/
 
 # Copy release.txt, readme.txt and license.txt into share.
-cp $ROOT/$RELEASE_FILE $INSTALLDIR_NATIVE_DOC/
-cp $ROOT/$README_FILE $INSTALLDIR_NATIVE_DOC/
-cp $ROOT/$LICENSE_FILE $INSTALLDIR_NATIVE_DOC/
+cp $SRCDIR/$RELEASE_FILE $INSTALLDIR_NATIVE_DOC/
+cp $SRCDIR/$README_FILE $INSTALLDIR_NATIVE_DOC/
+cp $SRCDIR/$LICENSE_FILE $INSTALLDIR_NATIVE_DOC/
 
 # Copy the samples from src to make the final package.
 copy_dir_clean $SRCDIR/$SAMPLES $INSTALLDIR_NATIVE/share/gcc-arm-none-eabi/$SAMPLES
@@ -897,9 +897,9 @@ if [ "x$skip_mingw32" != "xyes" ] ; then
     rm -f $PACKAGEDIR/$PACKAGE_NAME_MINGW.exe
     pushd $BUILDDIR_MINGW
     rm -f $INSTALL_PACKAGE_NAME
-    cp $ROOT/$RELEASE_FILE $INSTALLDIR_MINGW_DOC/
-    cp $ROOT/$README_FILE $INSTALLDIR_MINGW_DOC/
-    cp $ROOT/$LICENSE_FILE $INSTALLDIR_MINGW_DOC/
+    cp $SRCDIR/$RELEASE_FILE $INSTALLDIR_MINGW_DOC/
+    cp $SRCDIR/$README_FILE $INSTALLDIR_MINGW_DOC/
+    cp $SRCDIR/$LICENSE_FILE $INSTALLDIR_MINGW_DOC/
     copy_dir_clean $SRCDIR/$SAMPLES $INSTALLDIR_MINGW/share/gcc-arm-none-eabi/$SAMPLES
     flip -m $INSTALLDIR_MINGW_DOC/$RELEASE_FILE
     flip -m $INSTALLDIR_MINGW_DOC/$README_FILE
@@ -962,9 +962,9 @@ if [ "x$skip_package_sources" != "xyes" ]; then
           --exclude=build.log --exclude=output
     fi
     cp "$SRCDIR/source.spc" "$PACKAGE_NAME/src/"
-    cp "$ROOT/$RELEASE_FILE" "$PACKAGE_NAME/"
-    cp "$ROOT/$README_FILE" "$PACKAGE_NAME/"
-    cp "$ROOT/$LICENSE_FILE" "$PACKAGE_NAME/"
+    cp "$SRCDIR/$RELEASE_FILE" "$PACKAGE_NAME/src"
+    cp "$SRCDIR/$README_FILE" "$PACKAGE_NAME/src"
+    cp "$SRCDIR/$LICENSE_FILE" "$PACKAGE_NAME/src"
 
     if [ "x$is_ppa_release" != "xyes" ] && [ "x$skip_howto" != "xyes" ]; then
         cp "$ROOT/$BUILD_MANUAL_FILE" "$PACKAGE_NAME/"
