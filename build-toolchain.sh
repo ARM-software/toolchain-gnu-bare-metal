@@ -67,8 +67,8 @@ OPTIONS:
                         them with comma for skipping more than one steps.
                         Available steps are:
                             gdb-with-python
-                            mingw32
-                            mingw32-gdb-with-python
+                            mingw[32]
+                            mingw[32]-gdb-with-python
                             package_sources
                             md5_checksum
                             howto
@@ -157,11 +157,11 @@ if [ "x$skip_steps" != "x" ]; then
             gdb-with-python)
                 skip_gdb_with_python=yes
                 ;;
-            mingw32)
+            mingw|mingw32)
                 skip_mingw32=yes
                 skip_mingw32_gdb_with_python=yes
                 ;;
-            mingw32-gdb-with-python)
+            mingw-gdb-with-python|mingw32-gdb-with-python)
                 skip_mingw32_gdb_with_python=yes
                 ;;
             *)
