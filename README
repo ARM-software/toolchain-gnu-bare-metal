@@ -1,6 +1,7 @@
 How to build GNU toolchain for Arm Embedded Processors.
 
-Software required to build:
+System requirement:
+- 25G of free disk space
 - Docker (installed with appropriate permission)
 
 Default build command:

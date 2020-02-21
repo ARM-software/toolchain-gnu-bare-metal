@@ -1,7 +1,7 @@
 [binutils]
 type=git
 url=git://sourceware.org/git/binutils-gdb.git
-version=binutils-2_33-branch
+version=52f9b3adc0771944d2c988a91ba3a69820f3844a
 
 [gdb]
 type=git
@@ -16,4 +16,4 @@ version=277439
 [newlib]
 type=git
 url=git://sourceware.org/git/newlib-cygwin.git
-version=HEAD
+version=572687310059534b2da9428ca19df992509c8a5d
