@@ -107,12 +107,14 @@ extract_source ()
 # this function parse ini style file to find source info
 parse_ini ()
 {
+    set +e
     section=$1
     item=$2
     file=./source.spc
     cat $file | sed -nE "/^\s*\[$section\]/,/^\s*\[.*\]/p" \
               | grep -E "^\s*$item=" \
               | sed "s/.*=//"
+    set -e
 }
 
 checkout_source ()

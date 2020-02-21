@@ -9,9 +9,8 @@ url=git://sourceware.org/git/binutils-gdb.git
 version=e908e11a4f74ab6a06aef8c302a03b2a0dbc4d83
 
 [gcc]
-type=svn
-url=svn://gcc.gnu.org/svn/gcc/branches/ARM/arm-9-branch
-version=277439
+type=git
+url=git://gcc.gnu.org/git/gcc.git
 
 [newlib]
 type=git
