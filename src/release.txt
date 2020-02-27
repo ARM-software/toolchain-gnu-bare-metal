@@ -1,7 +1,7 @@
 Release notes for
 *************************************************
 GNU Tools for Arm Embedded Processors 9
-                               - Q4 2019
+                               - Q1 2020
 *************************************************
 
 This release includes bare metal pre-built binaries for AArch32 EABI targets,
@@ -70,7 +70,9 @@ Tests:
   + Qemu
   + Arm Fast Models
 
-Important changes in 9-2019Q4 major release:
+Important changes:
+* Resolved security vulnerbility: https://census-labs.com/news/2020/01/31/multiple-null-pointer-dereference-vulnerabilities-in-newlib/
+
 * Windows package only tested on Windows 10.
 
 * Fixed https://sourceware.org/bugzilla/show_bug.cgi?id=24289
