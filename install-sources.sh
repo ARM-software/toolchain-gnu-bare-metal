@@ -125,6 +125,12 @@ checkout_source ()
     git)
         git clone $url $prj
         pushd $prj
+        if [ "x$prj" = "xgcc" ]; then
+            # GCC git repo needs to fetch vendor branch before checkout
+            # ignore false return as this might not always apply
+            ./contrib/gcc-git-customization.sh < /dev/null || true
+            ./contrib/git-fetch-vendor.sh ARM || true
+        fi
         git checkout $version
         popd
         ;;
@@ -134,11 +140,6 @@ checkout_source ()
     *)
         error Do not know how to deal with $type
     esac
-    if [ "x$prj" = "xgcc" ]; then
-      pushd gcc
-        ./contrib/gcc_update -r $version
-      popd
-    fi
 }
 
 cd $SRCDIR
