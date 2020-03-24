@@ -67,12 +67,13 @@ OPTIONS:
                         them with comma for skipping more than one steps.
                         Available steps are:
                             gdb-with-python
-                            mingw[32]
-                            mingw[32]-gdb-with-python
-                            package_sources
-                            md5_checksum
                             howto
                             manual
+                            md5_checksum
+                            mingw[32]
+                            mingw[32]-gdb-with-python
+                            native
+                            package_sources
 EOF
 }
 
@@ -92,6 +93,7 @@ skip_md5_checksum=no
 skip_steps=
 skip_gdb_with_python=no
 skip_mingw32_gdb_with_python=no
+skip_native_build=no
 build_type=
 
 MULTILIB_LIST="--with-multilib-list=rmprofile"
@@ -164,6 +166,9 @@ if [ "x$skip_steps" != "x" ]; then
             mingw-gdb-with-python|mingw32-gdb-with-python)
                 skip_mingw32_gdb_with_python=yes
                 ;;
+            native)
+                skip_native_build=yes
+                ;;
             *)
                echo "Unknown build steps: $ss" 1>&2
                usage
@@ -182,10 +187,6 @@ if [ "x$BUILD" == "xx86_64-apple-darwin10" ] || [ "x$is_ppa_release" == "xyes" ]
     skip_mingw32=yes
     skip_mingw32_gdb_with_python=yes
     BUILD_OPTIONS="$BUILD_OPTIONS -fbracket-depth=512"
-fi
-
-if [ "x$host_arch" == "xaarch64" ]; then
-    skip_mingw32=yes
 fi
 
 #Building mingw gdb with python support requires python windows package and
@@ -221,297 +222,29 @@ if [ "x$is_ppa_release" != "xyes" ]; then
                     --with-libexpat-prefix=$BUILDDIR_NATIVE/host-libs/usr "
 fi
 
-mkdir -p $BUILDDIR_NATIVE
-rm -rf $INSTALLDIR_NATIVE && mkdir -p $INSTALLDIR_NATIVE
+if [ "x$skip_native_build" != "xyes" ] ; then
+    mkdir -p $BUILDDIR_NATIVE
+    rm -rf $INSTALLDIR_NATIVE && mkdir -p $INSTALLDIR_NATIVE
+    rm -rf $PACKAGEDIR && mkdir -p $PACKAGEDIR
+fi
+
 if [ "x$skip_mingw32" != "xyes" ] ; then
     mkdir -p $BUILDDIR_MINGW
     rm -rf $INSTALLDIR_MINGW && mkdir -p $INSTALLDIR_MINGW
 fi
-rm -rf $PACKAGEDIR && mkdir -p $PACKAGEDIR
 
 cd $SRCDIR
 
-echo Task [III-0] /$HOST_NATIVE/binutils/
-rm -rf $BUILDDIR_NATIVE/binutils && mkdir -p $BUILDDIR_NATIVE/binutils
-pushd $BUILDDIR_NATIVE/binutils
-saveenv
-saveenvvar CFLAGS "$ENV_CFLAGS"
-saveenvvar CPPFLAGS "$ENV_CPPFLAGS"
-saveenvvar LDFLAGS "$ENV_LDFLAGS"
-$SRCDIR/$BINUTILS/configure  \
-    ${BINUTILS_CONFIG_OPTS} \
-    --target=$TARGET \
-    --prefix=$INSTALLDIR_NATIVE \
-    --infodir=$INSTALLDIR_NATIVE_DOC/info \
-    --mandir=$INSTALLDIR_NATIVE_DOC/man \
-    --htmldir=$INSTALLDIR_NATIVE_DOC/html \
-    --pdfdir=$INSTALLDIR_NATIVE_DOC/pdf \
-    --disable-nls \
-    --disable-werror \
-    --disable-sim \
-    --disable-gdb \
-    --enable-interwork \
-    --enable-plugins \
-    --with-sysroot=$INSTALLDIR_NATIVE/arm-none-eabi \
-    "--with-pkgversion=$PKGVERSION"
-
-make -j$JOBS
-
-make install
-
-if [ "x$skip_manual" != "xyes" ]; then
-    make install-html install-pdf
-fi
-
-copy_dir $INSTALLDIR_NATIVE $BUILDDIR_NATIVE/target-libs
-restoreenv
-popd
-
-pushd $INSTALLDIR_NATIVE
-rm -rf ./lib
-popd
-
-echo Task [III-1] /$HOST_NATIVE/gcc-first/
-rm -rf $BUILDDIR_NATIVE/gcc-first && mkdir -p $BUILDDIR_NATIVE/gcc-first
-pushd $BUILDDIR_NATIVE/gcc-first
-$SRCDIR/$GCC/configure --target=$TARGET \
-    --prefix=$INSTALLDIR_NATIVE \
-    --libexecdir=$INSTALLDIR_NATIVE/lib \
-    --infodir=$INSTALLDIR_NATIVE_DOC/info \
-    --mandir=$INSTALLDIR_NATIVE_DOC/man \
-    --htmldir=$INSTALLDIR_NATIVE_DOC/html \
-    --pdfdir=$INSTALLDIR_NATIVE_DOC/pdf \
-    --enable-languages=c \
-    --disable-decimal-float \
-    --disable-libffi \
-    --disable-libgomp \
-    --disable-libmudflap \
-    --disable-libquadmath \
-    --disable-libssp \
-    --disable-libstdcxx-pch \
-    --disable-nls \
-    --disable-shared \
-    --disable-threads \
-    --disable-tls \
-    --with-newlib \
-    --without-headers \
-    --with-gnu-as \
-    --with-gnu-ld \
-    --with-python-dir=share/gcc-arm-none-eabi \
-    --with-sysroot=$INSTALLDIR_NATIVE/arm-none-eabi \
-    ${GCC_CONFIG_OPTS}                              \
-    "${GCC_CONFIG_OPTS_LCPP}"                              \
-    "--with-pkgversion=$PKGVERSION" \
-    ${MULTILIB_LIST}
-
-make -j$JOBS CXXFLAGS="$BUILD_OPTIONS" all-gcc
-
-make install-gcc
-
-popd
-
-pushd $INSTALLDIR_NATIVE
-rm -rf bin/arm-none-eabi-gccbug
-rm -rf ./lib/libiberty.a
-rm -rf  include
-popd
-
-echo Task [III-2] /$HOST_NATIVE/newlib/
-saveenv
-prepend_path PATH $INSTALLDIR_NATIVE/bin
-saveenvvar CFLAGS_FOR_TARGET '-g -O2 -ffunction-sections -fdata-sections'
-rm -rf $BUILDDIR_NATIVE/newlib && mkdir -p $BUILDDIR_NATIVE/newlib
-pushd $BUILDDIR_NATIVE/newlib
-
-$SRCDIR/$NEWLIB/configure  \
-    $NEWLIB_CONFIG_OPTS \
-    --target=$TARGET \
-    --prefix=$INSTALLDIR_NATIVE \
-    --infodir=$INSTALLDIR_NATIVE_DOC/info \
-    --mandir=$INSTALLDIR_NATIVE_DOC/man \
-    --htmldir=$INSTALLDIR_NATIVE_DOC/html \
-    --pdfdir=$INSTALLDIR_NATIVE_DOC/pdf \
-    --enable-newlib-io-long-long \
-    --enable-newlib-io-c99-formats \
-    --enable-newlib-register-fini \
-    --enable-newlib-retargetable-locking \
-    --disable-newlib-supplied-syscalls \
-    --disable-nls
-
-make -j$JOBS
-
-make install
-
-if [ "x$skip_manual" != "xyes" ]; then
-    make pdf
-    mkdir -p $INSTALLDIR_NATIVE_DOC/pdf
-    cp $BUILDDIR_NATIVE/newlib/arm-none-eabi/newlib/libc/libc.pdf $INSTALLDIR_NATIVE_DOC/pdf/libc.pdf
-    cp $BUILDDIR_NATIVE/newlib/arm-none-eabi/newlib/libm/libm.pdf $INSTALLDIR_NATIVE_DOC/pdf/libm.pdf
-
-    make html
-    mkdir -p $INSTALLDIR_NATIVE_DOC/html
-    copy_dir $BUILDDIR_NATIVE/newlib/arm-none-eabi/newlib/libc/libc.html $INSTALLDIR_NATIVE_DOC/html/libc
-    copy_dir $BUILDDIR_NATIVE/newlib/arm-none-eabi/newlib/libm/libm.html $INSTALLDIR_NATIVE_DOC/html/libm
-fi
-
-popd
-restoreenv
-
-echo Task [III-3] /$HOST_NATIVE/newlib-nano/
-saveenv
-prepend_path PATH $INSTALLDIR_NATIVE/bin
-saveenvvar CFLAGS_FOR_TARGET '-g -Os -ffunction-sections -fdata-sections'
-rm -rf $BUILDDIR_NATIVE/newlib-nano && mkdir -p $BUILDDIR_NATIVE/newlib-nano
-pushd $BUILDDIR_NATIVE/newlib-nano
-
-$SRCDIR/$NEWLIB_NANO/configure  \
-    $NEWLIB_CONFIG_OPTS \
-    --target=$TARGET \
-    --prefix=$BUILDDIR_NATIVE/target-libs \
-    --disable-newlib-supplied-syscalls    \
-    --enable-newlib-reent-small           \
-    --enable-newlib-retargetable-locking  \
-    --disable-newlib-fvwrite-in-streamio  \
-    --disable-newlib-fseek-optimization   \
-    --disable-newlib-wide-orient          \
-    --enable-newlib-nano-malloc           \
-    --disable-newlib-unbuf-stream-opt     \
-    --enable-lite-exit                    \
-    --enable-newlib-global-atexit         \
-    --enable-newlib-nano-formatted-io     \
-    --disable-nls
-
-make -j$JOBS
-make install
-
-popd
-restoreenv
-
-echo Task [III-4] /$HOST_NATIVE/gcc-final/
-rm -f $INSTALLDIR_NATIVE/arm-none-eabi/usr
-ln -s . $INSTALLDIR_NATIVE/arm-none-eabi/usr
-
-rm -rf $BUILDDIR_NATIVE/gcc-final && mkdir -p $BUILDDIR_NATIVE/gcc-final
-pushd $BUILDDIR_NATIVE/gcc-final
-
-$SRCDIR/$GCC/configure --target=$TARGET \
-    --prefix=$INSTALLDIR_NATIVE \
-    --libexecdir=$INSTALLDIR_NATIVE/lib \
-    --infodir=$INSTALLDIR_NATIVE_DOC/info \
-    --mandir=$INSTALLDIR_NATIVE_DOC/man \
-    --htmldir=$INSTALLDIR_NATIVE_DOC/html \
-    --pdfdir=$INSTALLDIR_NATIVE_DOC/pdf \
-    --enable-languages=c,c++ \
-    --enable-plugins \
-    --disable-decimal-float \
-    --disable-libffi \
-    --disable-libgomp \
-    --disable-libmudflap \
-    --disable-libquadmath \
-    --disable-libssp \
-    --disable-libstdcxx-pch \
-    --disable-nls \
-    --disable-shared \
-    --disable-threads \
-    --disable-tls \
-    --with-gnu-as \
-    --with-gnu-ld \
-    --with-newlib \
-    --with-headers=yes \
-    --with-python-dir=share/gcc-arm-none-eabi \
-    --with-sysroot=$INSTALLDIR_NATIVE/arm-none-eabi \
-    $GCC_CONFIG_OPTS                                \
-    "${GCC_CONFIG_OPTS_LCPP}"                              \
-    "--with-pkgversion=$PKGVERSION" \
-    ${MULTILIB_LIST}
-
-# Passing USE_TM_CLONE_REGISTRY=0 via INHIBIT_LIBC_CFLAGS to disable
-# transactional memory related code in crtbegin.o.
-# This is a workaround. Better approach is have a t-* to set this flag via
-# CRTSTUFF_T_CFLAGS
-make -j$JOBS CXXFLAGS="$BUILD_OPTIONS" \
-        INHIBIT_LIBC_CFLAGS="-DUSE_TM_CLONE_REGISTRY=0"
-
-make install
-
-if [ "x$skip_manual" != "xyes" ]; then
-    make install-html install-pdf
-fi
-
-pushd $INSTALLDIR_NATIVE
-rm -rf bin/arm-none-eabi-gccbug
-LIBIBERTY_LIBRARIES=$(find $INSTALLDIR_NATIVE/arm-none-eabi/lib -name libiberty.a)
-for libiberty_lib in $LIBIBERTY_LIBRARIES ; do
-    rm -rf $libiberty_lib
-done
-rm -rf ./lib/libiberty.a
-rm -rf  include
-popd
-
-rm -f $INSTALLDIR_NATIVE/arm-none-eabi/usr
-popd
-
-echo Task [III-5] /$HOST_NATIVE/gcc-size-libstdcxx/
-rm -f $BUILDDIR_NATIVE/target-libs/arm-none-eabi/usr
-ln -s . $BUILDDIR_NATIVE/target-libs/arm-none-eabi/usr
-
-rm -rf $BUILDDIR_NATIVE/gcc-size-libstdcxx && mkdir -p $BUILDDIR_NATIVE/gcc-size-libstdcxx
-pushd $BUILDDIR_NATIVE/gcc-size-libstdcxx
-
-$SRCDIR/$GCC/configure --target=$TARGET \
-    --prefix=$BUILDDIR_NATIVE/target-libs \
-    --enable-languages=c,c++ \
-    --disable-decimal-float \
-    --disable-libffi \
-    --disable-libgomp \
-    --disable-libmudflap \
-    --disable-libquadmath \
-    --disable-libssp \
-    --disable-libstdcxx-pch \
-    --disable-libstdcxx-verbose \
-    --disable-nls \
-    --disable-shared \
-    --disable-threads \
-    --disable-tls \
-    --with-gnu-as \
-    --with-gnu-ld \
-    --with-newlib \
-    --with-headers=yes \
-    --with-python-dir=share/gcc-arm-none-eabi \
-    --with-sysroot=$BUILDDIR_NATIVE/target-libs/arm-none-eabi \
-    $GCC_CONFIG_OPTS \
-    "${GCC_CONFIG_OPTS_LCPP}"                              \
-    "--with-pkgversion=$PKGVERSION" \
-    ${MULTILIB_LIST}
-
-make -j$JOBS CCXXFLAGS="$BUILD_OPTIONS" CXXFLAGS_FOR_TARGET="-g -Os -ffunction-sections -fdata-sections -fno-exceptions"
-make install
-
-copy_multi_libs src_prefix="$BUILDDIR_NATIVE/target-libs/arm-none-eabi/lib" \
-                dst_prefix="$INSTALLDIR_NATIVE/arm-none-eabi/lib"           \
-                target_gcc="$BUILDDIR_NATIVE/target-libs/bin/arm-none-eabi-gcc"
-
-# Copy the nano configured newlib.h file into the location that nano.specs
-# expects it to be.
-mkdir -p $INSTALLDIR_NATIVE/arm-none-eabi/include/newlib-nano
-cp -f $BUILDDIR_NATIVE/target-libs/arm-none-eabi/include/newlib.h \
-      $INSTALLDIR_NATIVE/arm-none-eabi/include/newlib-nano/newlib.h
-
-popd
-
-echo Task [III-6] /$HOST_NATIVE/gdb/
-build_gdb()
-{
-    GDB_EXTRA_CONFIG_OPTS=$1
-
-    rm -rf $BUILDDIR_NATIVE/gdb && mkdir -p $BUILDDIR_NATIVE/gdb
-    pushd $BUILDDIR_NATIVE/gdb
+if [ "x$skip_native_build" != "xyes" ] ; then
+    echo Task [III-0] /$HOST_NATIVE/binutils/ | tee -a "$BUILDDIR_NATIVE/.stage"
+    rm -rf $BUILDDIR_NATIVE/binutils && mkdir -p $BUILDDIR_NATIVE/binutils
+    pushd $BUILDDIR_NATIVE/binutils
     saveenv
     saveenvvar CFLAGS "$ENV_CFLAGS"
     saveenvvar CPPFLAGS "$ENV_CPPFLAGS"
     saveenvvar LDFLAGS "$ENV_LDFLAGS"
-
-    $SRCDIR/$GDB/configure  \
+    $SRCDIR/$BINUTILS/configure  \
+        ${BINUTILS_CONFIG_OPTS} \
         --target=$TARGET \
         --prefix=$INSTALLDIR_NATIVE \
         --infodir=$INSTALLDIR_NATIVE_DOC/info \
@@ -519,17 +252,12 @@ build_gdb()
         --htmldir=$INSTALLDIR_NATIVE_DOC/html \
         --pdfdir=$INSTALLDIR_NATIVE_DOC/pdf \
         --disable-nls \
+        --disable-werror \
         --disable-sim \
-        --disable-gas \
-        --disable-binutils \
-        --disable-ld \
-        --disable-gprof \
-        --with-libexpat \
-        --with-lzma=no \
-        --with-system-gdbinit=$INSTALLDIR_NATIVE/$HOST_NATIVE/arm-none-eabi/lib/gdbinit \
-        $GDB_CONFIG_OPTS \
-        $GDB_EXTRA_CONFIG_OPTS \
-        '--with-gdb-datadir='\''${prefix}'\''/arm-none-eabi/share/gdb' \
+        --disable-gdb \
+        --enable-interwork \
+        --enable-plugins \
+        --with-sysroot=$INSTALLDIR_NATIVE/arm-none-eabi \
         "--with-pkgversion=$PKGVERSION"
 
     make -j$JOBS
@@ -540,140 +268,418 @@ build_gdb()
         make install-html install-pdf
     fi
 
+    copy_dir $INSTALLDIR_NATIVE $BUILDDIR_NATIVE/target-libs
     restoreenv
     popd
-}
 
-
-#Always enable python support in GDB for PPA build.
-if [ "x$is_ppa_release" == "xyes" ]; then
-    build_gdb "--with-python=yes"
-else
-    #First we build GDB without python support.
-    build_gdb "--with-python=no"
-
-    #Then build gdb with python support.
-    if [ "x$skip_gdb_with_python" == "xno" ]; then
-        build_gdb "--with-python=yes --program-prefix=$TARGET-  --program-suffix=-py"
-    fi
-fi
-
-if [ "x$is_ppa_release" != "xyes" -a "x$skip_howto" != "xyes" ]; then
-    echo TASK [III-7] /$HOST_NATIVE/build-manual
-    rm -rf $BUILDDIR_NATIVE/build-manual && mkdir -p $BUILDDIR_NATIVE/build-manual
-    pushd $BUILDDIR_NATIVE/build-manual
-    cp -r $SRCDIR/$BUILD_MANUAL/* .
-    echo "@set VERSION_PACKAGE ($PKGVERSION)" > version.texi
-    echo "@set CURRENT_YEAR  $release_year" >> version.texi
-    echo "@set CURRENT_MONTH $release_month" >> version.texi
-    echo "@set PKG_NAME $PACKAGE_NAME" >> version.texi
-    make clean
-    make
-    rm -rf $ROOT/How-to-build-toolchain.pdf
-    cp How-to-build-toolchain.pdf $ROOT
+    pushd $INSTALLDIR_NATIVE
+    rm -rf ./lib
     popd
-fi
 
-echo Task [III-8] /$HOST_NATIVE/pretidy/
-rm -rf $INSTALLDIR_NATIVE/lib/libiberty.a
-find $INSTALLDIR_NATIVE -name '*.la' -exec rm '{}' ';'
+    echo Task [III-1] /$HOST_NATIVE/gcc-first/ | tee -a "$BUILDDIR_NATIVE/.stage"
+    rm -rf $BUILDDIR_NATIVE/gcc-first && mkdir -p $BUILDDIR_NATIVE/gcc-first
+    pushd $BUILDDIR_NATIVE/gcc-first
+    $SRCDIR/$GCC/configure --target=$TARGET \
+        --prefix=$INSTALLDIR_NATIVE \
+        --libexecdir=$INSTALLDIR_NATIVE/lib \
+        --infodir=$INSTALLDIR_NATIVE_DOC/info \
+        --mandir=$INSTALLDIR_NATIVE_DOC/man \
+        --htmldir=$INSTALLDIR_NATIVE_DOC/html \
+        --pdfdir=$INSTALLDIR_NATIVE_DOC/pdf \
+        --enable-languages=c \
+        --disable-decimal-float \
+        --disable-libffi \
+        --disable-libgomp \
+        --disable-libmudflap \
+        --disable-libquadmath \
+        --disable-libssp \
+        --disable-libstdcxx-pch \
+        --disable-nls \
+        --disable-shared \
+        --disable-threads \
+        --disable-tls \
+        --with-newlib \
+        --without-headers \
+        --with-gnu-as \
+        --with-gnu-ld \
+        --with-python-dir=share/gcc-arm-none-eabi \
+        --with-sysroot=$INSTALLDIR_NATIVE/arm-none-eabi \
+        ${GCC_CONFIG_OPTS}                              \
+        "${GCC_CONFIG_OPTS_LCPP}"                              \
+        "--with-pkgversion=$PKGVERSION" \
+        ${MULTILIB_LIST}
 
-echo Task [III-9] /$HOST_NATIVE/strip_host_objects/
-if [ "x$is_debug_build" == "xno" ] ; then
-    STRIP_BINARIES=$(find $INSTALLDIR_NATIVE/bin/ -name arm-none-eabi-\*)
-    for bin in $STRIP_BINARIES ; do
-        strip_binary strip $bin
+    make -j$JOBS CXXFLAGS="$BUILD_OPTIONS" all-gcc
+
+    make install-gcc
+
+    popd
+
+    pushd $INSTALLDIR_NATIVE
+    rm -rf bin/arm-none-eabi-gccbug
+    rm -rf ./lib/libiberty.a
+    rm -rf  include
+    popd
+
+    echo Task [III-2] /$HOST_NATIVE/newlib/ | tee -a "$BUILDDIR_NATIVE/.stage"
+    saveenv
+    prepend_path PATH $INSTALLDIR_NATIVE/bin
+    saveenvvar CFLAGS_FOR_TARGET '-g -O2 -ffunction-sections -fdata-sections'
+    rm -rf $BUILDDIR_NATIVE/newlib && mkdir -p $BUILDDIR_NATIVE/newlib
+    pushd $BUILDDIR_NATIVE/newlib
+
+    $SRCDIR/$NEWLIB/configure  \
+        $NEWLIB_CONFIG_OPTS \
+        --target=$TARGET \
+        --prefix=$INSTALLDIR_NATIVE \
+        --infodir=$INSTALLDIR_NATIVE_DOC/info \
+        --mandir=$INSTALLDIR_NATIVE_DOC/man \
+        --htmldir=$INSTALLDIR_NATIVE_DOC/html \
+        --pdfdir=$INSTALLDIR_NATIVE_DOC/pdf \
+        --enable-newlib-io-long-long \
+        --enable-newlib-io-c99-formats \
+        --enable-newlib-reent-check-verify \
+        --enable-newlib-register-fini \
+        --enable-newlib-retargetable-locking \
+        --disable-newlib-supplied-syscalls \
+        --disable-nls
+
+    make -j$JOBS
+
+    make install
+
+    if [ "x$skip_manual" != "xyes" ]; then
+        make pdf
+        mkdir -p $INSTALLDIR_NATIVE_DOC/pdf
+        cp $BUILDDIR_NATIVE/newlib/arm-none-eabi/newlib/libc/libc.pdf $INSTALLDIR_NATIVE_DOC/pdf/libc.pdf
+        cp $BUILDDIR_NATIVE/newlib/arm-none-eabi/newlib/libm/libm.pdf $INSTALLDIR_NATIVE_DOC/pdf/libm.pdf
+
+        make html
+        mkdir -p $INSTALLDIR_NATIVE_DOC/html
+        copy_dir $BUILDDIR_NATIVE/newlib/arm-none-eabi/newlib/libc/libc.html $INSTALLDIR_NATIVE_DOC/html/libc
+        copy_dir $BUILDDIR_NATIVE/newlib/arm-none-eabi/newlib/libm/libm.html $INSTALLDIR_NATIVE_DOC/html/libm
+    fi
+
+    popd
+    restoreenv
+
+    echo Task [III-3] /$HOST_NATIVE/newlib-nano/ | tee -a "$BUILDDIR_NATIVE/.stage"
+    saveenv
+    prepend_path PATH $INSTALLDIR_NATIVE/bin
+    saveenvvar CFLAGS_FOR_TARGET '-g -Os -ffunction-sections -fdata-sections'
+    rm -rf $BUILDDIR_NATIVE/newlib-nano && mkdir -p $BUILDDIR_NATIVE/newlib-nano
+    pushd $BUILDDIR_NATIVE/newlib-nano
+
+    $SRCDIR/$NEWLIB_NANO/configure  \
+        $NEWLIB_CONFIG_OPTS \
+        --target=$TARGET \
+        --prefix=$BUILDDIR_NATIVE/target-libs \
+        --disable-newlib-supplied-syscalls    \
+        --enable-newlib-reent-check-verify    \
+        --enable-newlib-reent-small           \
+        --enable-newlib-retargetable-locking  \
+        --disable-newlib-fvwrite-in-streamio  \
+        --disable-newlib-fseek-optimization   \
+        --disable-newlib-wide-orient          \
+        --enable-newlib-nano-malloc           \
+        --disable-newlib-unbuf-stream-opt     \
+        --enable-lite-exit                    \
+        --enable-newlib-global-atexit         \
+        --enable-newlib-nano-formatted-io     \
+        --disable-nls
+
+    make -j$JOBS
+    make install
+
+    popd
+    restoreenv
+
+    echo Task [III-4] /$HOST_NATIVE/gcc-final/ | tee -a "$BUILDDIR_NATIVE/.stage"
+    rm -f $INSTALLDIR_NATIVE/arm-none-eabi/usr
+    ln -s . $INSTALLDIR_NATIVE/arm-none-eabi/usr
+
+    rm -rf $BUILDDIR_NATIVE/gcc-final && mkdir -p $BUILDDIR_NATIVE/gcc-final
+    pushd $BUILDDIR_NATIVE/gcc-final
+
+    $SRCDIR/$GCC/configure --target=$TARGET \
+        --prefix=$INSTALLDIR_NATIVE \
+        --libexecdir=$INSTALLDIR_NATIVE/lib \
+        --infodir=$INSTALLDIR_NATIVE_DOC/info \
+        --mandir=$INSTALLDIR_NATIVE_DOC/man \
+        --htmldir=$INSTALLDIR_NATIVE_DOC/html \
+        --pdfdir=$INSTALLDIR_NATIVE_DOC/pdf \
+        --enable-languages=c,c++ \
+        --enable-plugins \
+        --disable-decimal-float \
+        --disable-libffi \
+        --disable-libgomp \
+        --disable-libmudflap \
+        --disable-libquadmath \
+        --disable-libssp \
+        --disable-libstdcxx-pch \
+        --disable-nls \
+        --disable-shared \
+        --disable-threads \
+        --disable-tls \
+        --with-gnu-as \
+        --with-gnu-ld \
+        --with-newlib \
+        --with-headers=yes \
+        --with-python-dir=share/gcc-arm-none-eabi \
+        --with-sysroot=$INSTALLDIR_NATIVE/arm-none-eabi \
+        $GCC_CONFIG_OPTS                                \
+        "${GCC_CONFIG_OPTS_LCPP}"                              \
+        "--with-pkgversion=$PKGVERSION" \
+        ${MULTILIB_LIST}
+
+    # Passing USE_TM_CLONE_REGISTRY=0 via INHIBIT_LIBC_CFLAGS to disable
+    # transactional memory related code in crtbegin.o.
+    # This is a workaround. Better approach is have a t-* to set this flag via
+    # CRTSTUFF_T_CFLAGS
+    make -j$JOBS CXXFLAGS="$BUILD_OPTIONS" \
+            INHIBIT_LIBC_CFLAGS="-DUSE_TM_CLONE_REGISTRY=0"
+
+    make install
+
+    if [ "x$skip_manual" != "xyes" ]; then
+        make install-html install-pdf
+    fi
+
+    pushd $INSTALLDIR_NATIVE
+    rm -rf bin/arm-none-eabi-gccbug
+    LIBIBERTY_LIBRARIES=$(find $INSTALLDIR_NATIVE/arm-none-eabi/lib -name libiberty.a)
+    for libiberty_lib in $LIBIBERTY_LIBRARIES ; do
+        rm -rf $libiberty_lib
     done
+    rm -rf ./lib/libiberty.a
+    rm -rf  include
+    popd
 
-    STRIP_BINARIES=$(find $INSTALLDIR_NATIVE/arm-none-eabi/bin/ -maxdepth 1 -mindepth 1 -name \*)
-    for bin in $STRIP_BINARIES ; do
-        strip_binary strip $bin
-    done
+    rm -f $INSTALLDIR_NATIVE/arm-none-eabi/usr
+    popd
 
-    if [ "x$BUILD" == "xx86_64-apple-darwin10" ]; then
-        STRIP_BINARIES=$(find $INSTALLDIR_NATIVE/lib/gcc/arm-none-eabi/$GCC_VER/ -maxdepth 1 -name \* -perm +111 -and ! -type d)
+    echo Task [III-5] /$HOST_NATIVE/gcc-size-libstdcxx/ | tee -a "$BUILDDIR_NATIVE/.stage"
+    rm -f $BUILDDIR_NATIVE/target-libs/arm-none-eabi/usr
+    ln -s . $BUILDDIR_NATIVE/target-libs/arm-none-eabi/usr
+
+    rm -rf $BUILDDIR_NATIVE/gcc-size-libstdcxx && mkdir -p $BUILDDIR_NATIVE/gcc-size-libstdcxx
+    pushd $BUILDDIR_NATIVE/gcc-size-libstdcxx
+
+    $SRCDIR/$GCC/configure --target=$TARGET \
+        --prefix=$BUILDDIR_NATIVE/target-libs \
+        --enable-languages=c,c++ \
+        --disable-decimal-float \
+        --disable-libffi \
+        --disable-libgomp \
+        --disable-libmudflap \
+        --disable-libquadmath \
+        --disable-libssp \
+        --disable-libstdcxx-pch \
+        --disable-libstdcxx-verbose \
+        --disable-nls \
+        --disable-shared \
+        --disable-threads \
+        --disable-tls \
+        --with-gnu-as \
+        --with-gnu-ld \
+        --with-newlib \
+        --with-headers=yes \
+        --with-python-dir=share/gcc-arm-none-eabi \
+        --with-sysroot=$BUILDDIR_NATIVE/target-libs/arm-none-eabi \
+        $GCC_CONFIG_OPTS \
+        "${GCC_CONFIG_OPTS_LCPP}"                              \
+        "--with-pkgversion=$PKGVERSION" \
+        ${MULTILIB_LIST}
+
+    make -j$JOBS CCXXFLAGS="$BUILD_OPTIONS" CXXFLAGS_FOR_TARGET="-g -Os -ffunction-sections -fdata-sections -fno-exceptions"
+    make install
+
+    copy_multi_libs src_prefix="$BUILDDIR_NATIVE/target-libs/arm-none-eabi/lib" \
+                    dst_prefix="$INSTALLDIR_NATIVE/arm-none-eabi/lib"           \
+                    target_gcc="$BUILDDIR_NATIVE/target-libs/bin/arm-none-eabi-gcc"
+
+    # Copy the nano configured newlib.h file into the location that nano.specs
+    # expects it to be.
+    mkdir -p $INSTALLDIR_NATIVE/arm-none-eabi/include/newlib-nano
+    cp -f $BUILDDIR_NATIVE/target-libs/arm-none-eabi/include/newlib.h \
+          $INSTALLDIR_NATIVE/arm-none-eabi/include/newlib-nano/newlib.h
+
+    popd
+
+    echo Task [III-6] /$HOST_NATIVE/gdb/ | tee -a "$BUILDDIR_NATIVE/.stage"
+    build_gdb()
+    {
+        GDB_EXTRA_CONFIG_OPTS=$1
+
+        rm -rf $BUILDDIR_NATIVE/gdb && mkdir -p $BUILDDIR_NATIVE/gdb
+        pushd $BUILDDIR_NATIVE/gdb
+        saveenv
+        saveenvvar CFLAGS "$ENV_CFLAGS"
+        saveenvvar CPPFLAGS "$ENV_CPPFLAGS"
+        saveenvvar LDFLAGS "$ENV_LDFLAGS"
+
+        $SRCDIR/$GDB/configure  \
+            --target=$TARGET \
+            --prefix=$INSTALLDIR_NATIVE \
+            --infodir=$INSTALLDIR_NATIVE_DOC/info \
+            --mandir=$INSTALLDIR_NATIVE_DOC/man \
+            --htmldir=$INSTALLDIR_NATIVE_DOC/html \
+            --pdfdir=$INSTALLDIR_NATIVE_DOC/pdf \
+            --disable-nls \
+            --disable-sim \
+            --disable-gas \
+            --disable-binutils \
+            --disable-ld \
+            --disable-gprof \
+            --with-libexpat \
+            --with-lzma=no \
+            --with-system-gdbinit=$INSTALLDIR_NATIVE/$HOST_NATIVE/arm-none-eabi/lib/gdbinit \
+            $GDB_CONFIG_OPTS \
+            $GDB_EXTRA_CONFIG_OPTS \
+            '--with-gdb-datadir='\''${prefix}'\''/arm-none-eabi/share/gdb' \
+            "--with-pkgversion=$PKGVERSION"
+
+        make -j$JOBS
+
+        make install
+
+        if [ "x$skip_manual" != "xyes" ]; then
+            make install-html install-pdf
+        fi
+
+        restoreenv
+        popd
+    }
+
+
+    #Always enable python support in GDB for PPA build.
+    if [ "x$is_ppa_release" == "xyes" ]; then
+        build_gdb "--with-python=yes"
     else
-        STRIP_BINARIES=$(find $INSTALLDIR_NATIVE/lib/gcc/arm-none-eabi/$GCC_VER/ -maxdepth 1 -name \* -perm /111 -and ! -type d)
+        #First we build GDB without python support.
+        build_gdb "--with-python=no"
+
+        #Then build gdb with python support.
+        if [ "x$skip_gdb_with_python" == "xno" ]; then
+            build_gdb "--with-python=yes --program-prefix=$TARGET-  --program-suffix=-py"
+        fi
     fi
-    for bin in $STRIP_BINARIES ; do
-        strip_binary strip $bin
+
+    if [ "x$is_ppa_release" != "xyes" -a "x$skip_howto" != "xyes" ]; then
+        echo TASK [III-7] /$HOST_NATIVE/build-manual
+        rm -rf $BUILDDIR_NATIVE/build-manual && mkdir -p $BUILDDIR_NATIVE/build-manual
+        pushd $BUILDDIR_NATIVE/build-manual
+        cp -r $SRCDIR/$BUILD_MANUAL/* .
+        echo "@set VERSION_PACKAGE ($PKGVERSION)" > version.texi
+        echo "@set CURRENT_YEAR  $release_year" >> version.texi
+        echo "@set CURRENT_MONTH $release_month" >> version.texi
+        echo "@set PKG_NAME $PACKAGE_NAME" >> version.texi
+        make clean
+        make
+        rm -rf $ROOT/How-to-build-toolchain.pdf
+        cp How-to-build-toolchain.pdf $ROOT
+        popd
+    fi
+
+    echo Task [III-8] /$HOST_NATIVE/pretidy/ | tee -a "$BUILDDIR_NATIVE/.stage"
+    rm -rf $INSTALLDIR_NATIVE/lib/libiberty.a
+    find $INSTALLDIR_NATIVE -name '*.la' -exec rm '{}' ';'
+
+    echo Task [III-9] /$HOST_NATIVE/strip_host_objects/ | tee -a "$BUILDDIR_NATIVE/.stage"
+    if [ "x$is_debug_build" == "xno" ] ; then
+        STRIP_BINARIES=$(find $INSTALLDIR_NATIVE/bin/ -name arm-none-eabi-\*)
+        for bin in $STRIP_BINARIES ; do
+            strip_binary strip $bin
+        done
+
+        STRIP_BINARIES=$(find $INSTALLDIR_NATIVE/arm-none-eabi/bin/ -maxdepth 1 -mindepth 1 -name \*)
+        for bin in $STRIP_BINARIES ; do
+            strip_binary strip $bin
+        done
+
+        if [ "x$BUILD" == "xx86_64-apple-darwin10" ]; then
+            STRIP_BINARIES=$(find $INSTALLDIR_NATIVE/lib/gcc/arm-none-eabi/$GCC_VER/ -maxdepth 1 -name \* -perm +111 -and ! -type d)
+        else
+            STRIP_BINARIES=$(find $INSTALLDIR_NATIVE/lib/gcc/arm-none-eabi/$GCC_VER/ -maxdepth 1 -name \* -perm /111 -and ! -type d)
+        fi
+        for bin in $STRIP_BINARIES ; do
+            strip_binary strip $bin
+        done
+    fi
+
+    echo Task [III-10] /$HOST_NATIVE/strip_target_objects/ | tee -a "$BUILDDIR_NATIVE/.stage"
+    saveenv
+    prepend_path PATH $INSTALLDIR_NATIVE/bin
+    TARGET_LIBRARIES=$(find $INSTALLDIR_NATIVE/arm-none-eabi/lib -name \*.a)
+    for target_lib in $TARGET_LIBRARIES ; do
+        arm-none-eabi-objcopy -R .comment -R .note -R .debug_info -R .debug_aranges -R .debug_pubnames -R .debug_pubtypes -R .debug_abbrev -R .debug_line -R .debug_str -R .debug_ranges -R .debug_loc $target_lib || true
     done
-fi
 
-echo Task [III-10] /$HOST_NATIVE/strip_target_objects/
-saveenv
-prepend_path PATH $INSTALLDIR_NATIVE/bin
-TARGET_LIBRARIES=$(find $INSTALLDIR_NATIVE/arm-none-eabi/lib -name \*.a)
-for target_lib in $TARGET_LIBRARIES ; do
-    arm-none-eabi-objcopy -R .comment -R .note -R .debug_info -R .debug_aranges -R .debug_pubnames -R .debug_pubtypes -R .debug_abbrev -R .debug_line -R .debug_str -R .debug_ranges -R .debug_loc $target_lib || true
-done
+    TARGET_OBJECTS=$(find $INSTALLDIR_NATIVE/arm-none-eabi/lib -name \*.o)
+    for target_obj in $TARGET_OBJECTS ; do
+        arm-none-eabi-objcopy -R .comment -R .note -R .debug_info -R .debug_aranges -R .debug_pubnames -R .debug_pubtypes -R .debug_abbrev -R .debug_line -R .debug_str -R .debug_ranges -R .debug_loc $target_obj || true
+    done
 
-TARGET_OBJECTS=$(find $INSTALLDIR_NATIVE/arm-none-eabi/lib -name \*.o)
-for target_obj in $TARGET_OBJECTS ; do
-    arm-none-eabi-objcopy -R .comment -R .note -R .debug_info -R .debug_aranges -R .debug_pubnames -R .debug_pubtypes -R .debug_abbrev -R .debug_line -R .debug_str -R .debug_ranges -R .debug_loc $target_obj || true
-done
+    TARGET_LIBRARIES=$(find $INSTALLDIR_NATIVE/lib/gcc/arm-none-eabi/$GCC_VER -name \*.a)
+    for target_lib in $TARGET_LIBRARIES ; do
+        arm-none-eabi-objcopy -R .comment -R .note -R .debug_info -R .debug_aranges -R .debug_pubnames -R .debug_pubtypes -R .debug_abbrev -R .debug_line -R .debug_str -R .debug_ranges -R .debug_loc $target_lib || true
+    done
 
-TARGET_LIBRARIES=$(find $INSTALLDIR_NATIVE/lib/gcc/arm-none-eabi/$GCC_VER -name \*.a)
-for target_lib in $TARGET_LIBRARIES ; do
-    arm-none-eabi-objcopy -R .comment -R .note -R .debug_info -R .debug_aranges -R .debug_pubnames -R .debug_pubtypes -R .debug_abbrev -R .debug_line -R .debug_str -R .debug_ranges -R .debug_loc $target_lib || true
-done
+    TARGET_OBJECTS=$(find $INSTALLDIR_NATIVE/lib/gcc/arm-none-eabi/$GCC_VER -name \*.o)
+    for target_obj in $TARGET_OBJECTS ; do
+        arm-none-eabi-objcopy -R .comment -R .note -R .debug_info -R .debug_aranges -R .debug_pubnames -R .debug_pubtypes -R .debug_abbrev -R .debug_line -R .debug_str -R .debug_ranges -R .debug_loc $target_obj || true
+    done
+    restoreenv
 
-TARGET_OBJECTS=$(find $INSTALLDIR_NATIVE/lib/gcc/arm-none-eabi/$GCC_VER -name \*.o)
-for target_obj in $TARGET_OBJECTS ; do
-    arm-none-eabi-objcopy -R .comment -R .note -R .debug_info -R .debug_aranges -R .debug_pubnames -R .debug_pubtypes -R .debug_abbrev -R .debug_line -R .debug_str -R .debug_ranges -R .debug_loc $target_obj || true
-done
-restoreenv
+    # PPA release needn't following steps, so we exit here.
+    if [ "x$is_ppa_release" == "xyes" ] ; then
+      exit 0
+    fi
 
-# PPA release needn't following steps, so we exit here.
-if [ "x$is_ppa_release" == "xyes" ] ; then
-  exit 0
-fi
+    echo Task [III-11] /$HOST_NATIVE/package_tbz2/ | tee -a "$BUILDDIR_NATIVE/.stage"
 
-echo Task [III-11] /$HOST_NATIVE/package_tbz2/
+    # Copy release.txt, readme.txt and license.txt into share.
+    cp $ROOT/$RELEASE_FILE $INSTALLDIR_NATIVE_DOC/
+    cp $ROOT/$README_FILE $INSTALLDIR_NATIVE_DOC/
+    cp $ROOT/$LICENSE_FILE $INSTALLDIR_NATIVE_DOC/
 
-# Copy release.txt, readme.txt and license.txt into share.
-cp $SRCDIR/$RELEASE_FILE $INSTALLDIR_NATIVE_DOC/
-cp $SRCDIR/$README_FILE $INSTALLDIR_NATIVE_DOC/
-cp $SRCDIR/$LICENSE_FILE $INSTALLDIR_NATIVE_DOC/
+    # Copy the samples from src to make the final package.
+    copy_dir_clean $SRCDIR/$SAMPLES $INSTALLDIR_NATIVE/share/gcc-arm-none-eabi/$SAMPLES
 
-# Copy the samples from src to make the final package.
-copy_dir_clean $SRCDIR/$SAMPLES $INSTALLDIR_NATIVE/share/gcc-arm-none-eabi/$SAMPLES
+    # Cleanup any pre-existing state.
+    rm -f $PACKAGEDIR/$PACKAGE_NAME_NATIVE.tar.bz2
+    rm -f $BUILDDIR_NATIVE/$INSTALL_PACKAGE_NAME
 
-# Cleanup any pre-existing state.
-rm -f $PACKAGEDIR/$PACKAGE_NAME_NATIVE.tar.bz2
-rm -f $BUILDDIR_NATIVE/$INSTALL_PACKAGE_NAME
+    # Start making the package.
+    pushd $BUILDDIR_NATIVE
+    ln -s $INSTALLDIR_NATIVE $INSTALL_PACKAGE_NAME
 
-# Start making the package.
-pushd $BUILDDIR_NATIVE
-ln -s $INSTALLDIR_NATIVE $INSTALL_PACKAGE_NAME
+    # Make the package tarball.
+    ${TAR} cjf $PACKAGEDIR/$PACKAGE_NAME_NATIVE.tar.bz2   \
+        --exclude=host-$HOST_NATIVE             \
+        --exclude=host-$HOST_MINGW              \
+        $INSTALL_PACKAGE_NAME/arm-none-eabi     \
+        $INSTALL_PACKAGE_NAME/bin               \
+        $INSTALL_PACKAGE_NAME/lib               \
+        $INSTALL_PACKAGE_NAME/share
 
-# Make the package tarball.
-${TAR} cjf $PACKAGEDIR/$PACKAGE_NAME_NATIVE.tar.bz2   \
-    --owner=0                               \
-    --group=0                               \
-    --exclude=host-$HOST_NATIVE             \
-    --exclude=host-$HOST_MINGW              \
-    $INSTALL_PACKAGE_NAME/arm-none-eabi     \
-    $INSTALL_PACKAGE_NAME/bin               \
-    $INSTALL_PACKAGE_NAME/lib               \
-    $INSTALL_PACKAGE_NAME/share
-
-# Remove stale links.
-rm -f $INSTALL_PACKAGE_NAME
-popd
-
-# Extra actions for MacOS build after native toolchain build is completed
-if [ "$(uname)" = "Darwin" ]; then
-    echo "Task [III-12] /$PACKAGEDIR/pkgbuild_macos"
-    # Package MacOS toolchain to unsigned .pkg file
-    MACOS_PKG_TMP_DIR="$(mktemp -d)"
-    tar xf "$PACKAGEDIR/$PACKAGE_NAME_NATIVE.tar.bz2" -C "$MACOS_PKG_TMP_DIR"
-
-    pushd "$MACOS_PKG_TMP_DIR"
-    pkgbuild --root "$PACKAGE_NAME" --identifier "gcc.${TARGET}-${GCC_VER_NAME}" --version "$RELEASEVER" "$PACKAGEDIR/$PACKAGE_NAME_NATIVE.pkg"
+    # Remove stale links.
+    rm -f $INSTALL_PACKAGE_NAME
     popd
-    rm -rf "$MACOS_PKG_TMP_DIR"
-fi
+
+    # Extra actions for MacOS build after native toolchain build is completed
+    if [ "$(uname)" = "Darwin" ]; then
+        echo "Task [III-12] /$PACKAGEDIR/pkgbuild_macos"
+        # Package MacOS toolchain to unsigned .pkg file
+        MACOS_PKG_TMP_DIR="$(mktemp -d)"
+        tar xf "$PACKAGEDIR/$PACKAGE_NAME_NATIVE.tar.bz2" -C "$MACOS_PKG_TMP_DIR"
+
+        pushd "$MACOS_PKG_TMP_DIR"
+        pkgbuild --root "$PACKAGE_NAME" --identifier "gcc.${TARGET}-${GCC_VER_NAME}" --version "$RELEASEVER" "$PACKAGEDIR/$PACKAGE_NAME_NATIVE.pkg"
+        popd
+        rm -rf "$MACOS_PKG_TMP_DIR"
+    fi
+fi  #if [ "x$skip_native_build" != "xyes" ] ; then
 
 # skip building mingw32 toolchain if "--skip_mingw32" specified
 # this huge if statement controls all $BUILDDIR_MINGW tasks till "task [IV-8]"
@@ -687,7 +693,7 @@ if [ "x$skip_mingw32" != "xyes" ] ; then
     saveenvvar STRIP $HOST_MINGW_TOOL-strip
     saveenvvar NM $HOST_MINGW_TOOL-nm
 
-    echo Task [IV-0] /$HOST_MINGW/host_unpack/
+    echo Task [IV-0] /$HOST_MINGW/host_unpack/ | tee -a "$BUILDDIR_MINGW/.stage"
     rm -rf $BUILDDIR_MINGW/tools-$OBJ_SUFFIX_NATIVE && mkdir $BUILDDIR_MINGW/tools-$OBJ_SUFFIX_NATIVE
     pushd $BUILDDIR_MINGW/tools-$OBJ_SUFFIX_NATIVE
     ln -s . $INSTALL_PACKAGE_NAME
@@ -695,7 +701,7 @@ if [ "x$skip_mingw32" != "xyes" ] ; then
     rm $INSTALL_PACKAGE_NAME
     popd
 
-    echo Task [IV-1] /$HOST_MINGW/binutils/
+    echo Task [IV-1] /$HOST_MINGW/binutils/ | tee -a "$BUILDDIR_MINGW/.stage"
     prepend_path PATH $BUILDDIR_MINGW/tools-$OBJ_SUFFIX_NATIVE/bin
     rm -rf $BUILDDIR_MINGW/binutils && mkdir -p $BUILDDIR_MINGW/binutils
     pushd $BUILDDIR_MINGW/binutils
@@ -733,7 +739,7 @@ if [ "x$skip_mingw32" != "xyes" ] ; then
     rm -rf ./lib
     popd
 
-    echo Task [IV-2] /$HOST_MINGW/copy_libs/
+    echo Task [IV-2] /$HOST_MINGW/copy_libs/ | tee -a "$BUILDDIR_MINGW/.stage"
     if [ "x$skip_manual" != "xyes" ]; then
         copy_dir $BUILDDIR_MINGW/tools-$OBJ_SUFFIX_NATIVE/share/doc/gcc-arm-none-eabi/html $INSTALLDIR_MINGW_DOC/html
         copy_dir $BUILDDIR_MINGW/tools-$OBJ_SUFFIX_NATIVE/share/doc/gcc-arm-none-eabi/pdf $INSTALLDIR_MINGW_DOC/pdf
@@ -743,7 +749,7 @@ if [ "x$skip_mingw32" != "xyes" ] ; then
     copy_dir $BUILDDIR_MINGW/tools-$OBJ_SUFFIX_NATIVE/arm-none-eabi/include/c++ $INSTALLDIR_MINGW/arm-none-eabi/include/c++
     copy_dir $BUILDDIR_MINGW/tools-$OBJ_SUFFIX_NATIVE/lib/gcc/arm-none-eabi $INSTALLDIR_MINGW/lib/gcc/arm-none-eabi
 
-    echo Task [IV-3] /$HOST_MINGW/gcc-final/
+    echo Task [IV-3] /$HOST_MINGW/gcc-final/ | tee -a "$BUILDDIR_MINGW/.stage"
     saveenv
     saveenvvar AR_FOR_TARGET $TARGET-ar
     saveenvvar NM_FOR_TARGET $TARGET-nm
@@ -816,7 +822,7 @@ if [ "x$skip_mingw32" != "xyes" ] ; then
       -and -not -name liblto_plugin-0.dll -exec rm -f \{\} \;
     restoreenv
 
-    echo Task [IV-4] /$HOST_MINGW/gdb/
+    echo Task [IV-4] /$HOST_MINGW/gdb/ | tee -a "$BUILDDIR_MINGW/.stage"
     build_mingw_gdb()
     {
         MINGW_GDB_CONF_OPTS=$1
@@ -860,14 +866,15 @@ if [ "x$skip_mingw32" != "xyes" ] ; then
         popd
     }
 
-    build_mingw_gdb "--with-python=no"
+    build_mingw_gdb_conf_opts="--disable-source-highlight --with-static-standard-libraries"
+    build_mingw_gdb "--with-python=no $build_mingw_gdb_conf_opts"
 
     if [ "x$skip_mingw32_gdb_with_python" == "xno" ]; then
         export GNURM_PYTHON_WIN_DIR=$SRCDIR/$PYTHON_WIN
-        build_mingw_gdb "--with-python=$script_path/python-config.sh --program-suffix=-py --program-prefix=$TARGET-"
+        build_mingw_gdb "--with-python=$script_path/python-config.sh --program-suffix=-py --program-prefix=$TARGET- $build_mingw_gdb_conf_opts"
     fi
 
-    echo Task [IV-5] /$HOST_MINGW/pretidy/
+    echo Task [IV-5] /$HOST_MINGW/pretidy/ | tee -a "$BUILDDIR_MINGW/.stage"
     pushd $INSTALLDIR_MINGW
     rm -rf ./lib/libiberty.a
     rm -rf $INSTALLDIR_MINGW_DOC/info
@@ -875,7 +882,7 @@ if [ "x$skip_mingw32" != "xyes" ] ; then
 
     find $INSTALLDIR_MINGW -name '*.la' -exec rm '{}' ';'
 
-    echo Task [IV-6] /$HOST_MINGW/strip_host_objects/
+    echo Task [IV-6] /$HOST_MINGW/strip_host_objects/ | tee -a "$BUILDDIR_MINGW/.stage"
     STRIP_BINARIES=$(find $INSTALLDIR_MINGW/bin/ -name arm-none-eabi-\*.exe)
     if [ "x$is_debug_build" == "xno" ] ; then
         for bin in $STRIP_BINARIES ; do
@@ -893,13 +900,13 @@ if [ "x$skip_mingw32" != "xyes" ] ; then
         done
     fi
 
-    echo Task [IV-7] /$HOST_MINGW/installation/
+    echo Task [IV-7] /$HOST_MINGW/installation/ | tee -a "$BUILDDIR_MINGW/.stage"
     rm -f $PACKAGEDIR/$PACKAGE_NAME_MINGW.exe
     pushd $BUILDDIR_MINGW
     rm -f $INSTALL_PACKAGE_NAME
-    cp $SRCDIR/$RELEASE_FILE $INSTALLDIR_MINGW_DOC/
-    cp $SRCDIR/$README_FILE $INSTALLDIR_MINGW_DOC/
-    cp $SRCDIR/$LICENSE_FILE $INSTALLDIR_MINGW_DOC/
+    cp $ROOT/$RELEASE_FILE $INSTALLDIR_MINGW_DOC/
+    cp $ROOT/$README_FILE $INSTALLDIR_MINGW_DOC/
+    cp $ROOT/$LICENSE_FILE $INSTALLDIR_MINGW_DOC/
     copy_dir_clean $SRCDIR/$SAMPLES $INSTALLDIR_MINGW/share/gcc-arm-none-eabi/$SAMPLES
     flip -m $INSTALLDIR_MINGW_DOC/$RELEASE_FILE
     flip -m $INSTALLDIR_MINGW_DOC/$README_FILE
@@ -955,29 +962,34 @@ if [ "x$skip_package_sources" != "xyes" ]; then
         eval prereq_pack="\$${prereq}_PACK"
         cp "$SRCDIR/$prereq_pack" "$PACKAGE_NAME/src/"
     done
+    if [ -f "$SRCDIR/source.spc" ]; then
+        cp "$SRCDIR/source.spc" "$PACKAGE_NAME/src/"
+    fi
 
     if [ "x$skip_mingw32" != "xyes" ] ; then
         pack_dir_clean "$SRCDIR" "$INSTALLATION" \
           "$PACKAGE_NAME/src/$INSTALLATION.tar.bz2" \
           --exclude=build.log --exclude=output
     fi
-    cp "$SRCDIR/source.spc" "$PACKAGE_NAME/src/"
-    cp "$SRCDIR/$RELEASE_FILE" "$PACKAGE_NAME/src"
-    cp "$SRCDIR/$README_FILE" "$PACKAGE_NAME/src"
-    cp "$SRCDIR/$LICENSE_FILE" "$PACKAGE_NAME/src"
+    cp "$ROOT/$RELEASE_FILE" "$PACKAGE_NAME/"
+    cp "$ROOT/$README_FILE" "$PACKAGE_NAME/"
+    cp "$ROOT/$LICENSE_FILE" "$PACKAGE_NAME/"
+    if [ -d "$ROOT/docker" ]; then
+        cp -r "$ROOT/docker" "$PACKAGE_NAME/"
+    fi
 
     if [ "x$is_ppa_release" != "xyes" ] && [ "x$skip_howto" != "xyes" ]; then
         cp "$ROOT/$BUILD_MANUAL_FILE" "$PACKAGE_NAME/"
     fi
 
-    cp "$ROOT/install-sources.sh" "$PACKAGE_NAME/"
-    cp "$ROOT/build-common.sh" "$PACKAGE_NAME/"
-    cp "$ROOT/build-prerequisites.sh" "$PACKAGE_NAME/"
-    cp "$ROOT/build-toolchain.sh" "$PACKAGE_NAME/"
-    cp "$ROOT/python-config.sh" "$PACKAGE_NAME/"
-    cp "$ROOT/build.sh" "$PACKAGE_NAME/"
-    cp "$ROOT/README" "$PACKAGE_NAME/"
-    cp -r "$ROOT/docker" "$PACKAGE_NAME/"
+    cp "$script_path/install-sources.sh" "$PACKAGE_NAME/"
+    cp "$script_path/build-common.sh" "$PACKAGE_NAME/"
+    cp "$script_path/build-prerequisites.sh" "$PACKAGE_NAME/"
+    cp "$script_path/build-toolchain.sh" "$PACKAGE_NAME/"
+    cp "$script_path/python-config.sh" "$PACKAGE_NAME/"
+    if [ -f "$script_path/build.sh" ]; then
+        cp "$script_path/build.sh" "$PACKAGE_NAME/"
+    fi
 
     tar cf "$PACKAGE_NAME-src.tar.bz2" "$PACKAGE_NAME" ${TAR_FLAGS:-}
     rm -rf "$PACKAGE_NAME"
@@ -1005,4 +1017,3 @@ if [ "x$skip_md5_checksum" != "xyes" ]; then
     fi
     popd
 fi
-echo Build completed! Packages can be found at dirctory "pkg"
