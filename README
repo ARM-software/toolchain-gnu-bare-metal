@@ -1,3 +1,13 @@
+# Deprecation Notice
+
+**This repository is now deprecated and will no longer be maintained. Arm now supports a comprehensive tool for building different toolchains for arm targets at this address.**
+
+**New Repository Link:** https://gitlab.arm.com/tooling/gnu-devtools-for-arm
+
+Please update your bookmarks and references to point to the new repository.
+
+---
+
 How to build GNU toolchain for Arm Embedded Processors.
 
 System requirement:
